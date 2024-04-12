@@ -6,9 +6,6 @@ from email import encoders
 from flask import Flask, request, send_file
 import docx
 import speech_recognition as sr
-import pyaudio
-import wave
-import subprocess
 
 app = Flask(__name__)
 
@@ -52,7 +49,7 @@ def index():
         .button-container {
             display: flex;
             justify-content: space-between;
-            width: 100%;
+            width: 80%;
             max-width: 600px;
             margin-bottom: 60px; /* Increased margin for a larger gap */
         }
@@ -134,72 +131,59 @@ def index():
     <div id="summarizedText"></div>
     <a id="downloadLink" class="download-link" href="/download">Download Word Document</a>
 
-        <script>
-            let recognition;
-            let isSummarizing = false;
-            let transcriptHistory = '';
+    <script>
+        let recognition;
+        let isSummarizing = false;
+        let transcriptHistory = '';
 
-            function startSummarization() {
-                recognition = new webkitSpeechRecognition();
-                recognition.continuous = true;
-                recognition.interimResults = false;
+        function startSummarization() {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = false;
 
-                recognition.onstart = function() {
-                    document.getElementById('status').innerText = 'Listening... Speak now.';
-                }
-
-                recognition.onresult = function(event) {
-                    let transcript = event.results[event.results.length - 1][0].transcript;
-                    transcriptHistory += transcript + ' ';
-                }
-                console.log(transcriptHistory)
-
-                recognition.start();
-                isSummarizing = true;
+            recognition.onstart = function() {
+                document.getElementById('status').innerText = 'Listening... Speak now.';
             }
 
-            function stopSummarization() {
-                if (recognition && isSummarizing) {
-                    recognition.stop();
-                    document.getElementById('status').innerText = 'Speech recognition stopped.';
-                    isSummarizing = false;
-                    summarizeTranscript();
-                }
+            recognition.onresult = function(event) {
+                let transcript = event.results[event.results.length - 1][0].transcript;
+                transcriptHistory += transcript + ' ';
             }
 
-            function summarizeTranscript() {
-                if (transcriptHistory.trim() !== '') {
-                    fetch('/summarize', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ speech: transcriptHistory })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        // Not displaying on the screen, just triggering the download
-                        window.location.href = '/download';
-                        sendEmail(data.summarized_text); // Call the sendEmail function after download
-                    })
-                    .catch(error => console.error('Error:', error));
-                } else {
-                    document.getElementById('summarizedText').innerText = 'No speech detected.';
-                }
-            }
+            recognition.start();
+            isSummarizing = true;
+        }
 
-            function sendEmail(summarizedText) {
-                fetch('/send-email', {
+        function stopSummarization() {
+            if (recognition && isSummarizing) {
+                recognition.stop();
+                document.getElementById('status').innerText = 'Speech recognition stopped.';
+                isSummarizing = false;
+                summarizeTranscript();
+            }
+        }
+
+        function summarizeTranscript() {
+            if (transcriptHistory.trim() !== '') {
+                fetch('/summarize', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ summarized_text: summarizedText })
+                    body: JSON.stringify({ speech: transcriptHistory })
                 })
-                .then(response => console.log('Email sent:', response))
-                .catch(error => console.error('Error sending email:', error));
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('summarizedText').innerText = data.summarized_text;
+                    document.getElementById('downloadLink').setAttribute('href', `/download?summarized_text=${encodeURIComponent(data.summarized_text)}`);
+                    document.getElementById('downloadLink').style.display = 'block';
+                })
+                .catch(error => console.error('Error:', error));
+            } else {
+                document.getElementById('summarizedText').innerText = 'No speech detected.';
             }
-        </script>
+        }
+    </script>
     </body>
     </html>
     '''
